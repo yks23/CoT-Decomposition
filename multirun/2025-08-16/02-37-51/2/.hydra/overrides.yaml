@@ -1,0 +1,4 @@
+- model_name=llama3.1@8b
+- output_path=./result/diverse-math-1.0-1.0
+- prompt_path=./preverification/zero-prompt2
+- number=2

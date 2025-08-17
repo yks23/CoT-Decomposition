@@ -1,0 +1,14 @@
+model_name: qwen2.5@7b
+use_api: false
+use_prompt: false
+output_path: result
+batch_size: 80
+max_new_tokens: 2048
+max_thread_num: 8
+prompt_path: ./preverification/zero-prompt
+result_path: ./result/diverse-gsm8k-0.7-0.4
+dataset: gsm8k
+repeat: 1
+tp1: 1.0
+tp2: 1.0
+number: 1

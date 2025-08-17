@@ -1,0 +1,904 @@
+[
+    {
+        "path": "result/ds-local-prompt/result.json",
+        "dataset": "gsm8k"
+    },
+    {
+        "path": "result/1.5o/result.json",
+        "dataset": "gsm8k"
+    },
+    {
+        "path": "result/1.5w/result.json",
+        "dataset": "gsm8k"
+    },
+    {
+        "path": "result/7w/result.json",
+        "dataset": "gsm8k"
+    },
+    {
+        "path": "result/7w1/result.json",
+        "dataset": "gsm8k"
+    },
+    {
+        "path": "result/1.5o/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7725549658832449
+    },
+    {
+        "path": "result/1.5w/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7422289613343442
+    },
+    {
+        "path": "result/7w/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8786959818043972
+    },
+    {
+        "path": "result/7w1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8771796815769523
+    },
+    {
+        "path": "result/ds-local-prompt/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7922668688400303
+    },
+    {
+        "path": "result/llama-local-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7020470053070508
+    },
+    {
+        "path": "result/llama-local-2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.711144806671721
+    },
+    {
+        "path": "result/llama-local-3/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6899166034874905
+    },
+    {
+        "path": "result/llama-local-4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.711144806671721
+    },
+    {
+        "path": "result/llama-local-5/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7103866565579985
+    },
+    {
+        "path": "result/llama-local-6/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7172100075815011
+    },
+    {
+        "path": "result/llama-new-fewshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8104624715693708
+    },
+    {
+        "path": "result/llama-new-fewshot2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7611827141774071
+    },
+    {
+        "path": "result/llama-new-zeroshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8316906747536013
+    },
+    {
+        "path": "result/llama-without-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.844579226686884
+    },
+    {
+        "path": "result/llama-without-2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8559514783927218
+    },
+    {
+        "path": "result/llama-without-math/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.632687447346251
+    },
+    {
+        "path": "result/llama-zeroshot-math/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.585
+    },
+    {
+        "path": "result/mistral-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.4844579226686884
+    },
+    {
+        "path": "result/mistral-2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.4844579226686884
+    },
+    {
+        "path": "result/mistral-math-zeroshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.28958333333333336
+    },
+    {
+        "path": "result/mistral-new-fewshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.5170583775587566
+    },
+    {
+        "path": "result/mistral-new-fewshot2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.5322213798332069
+    },
+    {
+        "path": "result/mistral-new-zeroshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.5572403335860501
+    },
+    {
+        "path": "result/mistral-without-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6110689916603488
+    },
+    {
+        "path": "result/mistral-without-2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6110689916603488
+    },
+    {
+        "path": "result/mistral-without-math/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.2805391743892165
+    },
+    {
+        "path": "result/qwen2.5-7b-local/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.844579226686884
+    },
+    {
+        "path": "result/qwen2.5-7b-local-prompt/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.844579226686884
+    },
+    {
+        "path": "./result/llama-without-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.636899747262005
+    },
+    {
+        "path": "./result/mistral-without-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.2805391743892165
+    },
+    {
+        "path": "./result/mistral-math-zeroshot/result.json",
+        "dataset": "math",
+        "accuracy": 0.278125
+    },
+    {
+        "path": "./result/llama-zeroshot-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.6196428571428572
+    },
+    {
+        "path": "./result/mistral-math-zeroshot/result.json",
+        "dataset": "math",
+        "accuracy": 0.275
+    },
+    {
+        "path": "./result/mistral-without-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.2805391743892165
+    },
+    {
+        "path": "./result/llama-zeroshot-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.6099410278011794
+    },
+    {
+        "path": "./result/llama-temperature/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6125
+    },
+    {
+        "path": "./result/llama-new-zeroshot/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8316906747536013
+    },
+    {
+        "path": "./result/llama-temperature/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.5375
+    },
+    {
+        "path": "./result/llama-temperature0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7429871114480667
+    },
+    {
+        "path": "./result/llama-temperature0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8097043214556482
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7808946171341926
+    },
+    {
+        "path": "./result/llama-temperature0-math/result.json",
+        "dataset": "math",
+        "accuracy": 0.5,
+        "best@": 2
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 1.0,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.78013646702047,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.78013646702047,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9457142857142857,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9482993197278912,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.944954128440367,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9456384323640961,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9448621553884712,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9423805913570887,
+        "best@": 6
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9423805913570887,
+        "best@": 6
+    },
+    {
+        "path": "./result/llama-temperature1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9423805913570887,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature0-noprompt/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.844579226686884,
+        "best@": 2
+    },
+    {
+        "path": "./result/llama-temperature-diverse/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8862774829416225,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-temperature-diverse/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6095526914329037,
+        "best@": 1
+    },
+    {
+        "path": "result/llama-temperature-diverse2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.868081880212282,
+        "best@": 4
+    },
+    {
+        "path": "./result/test-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6550416982562547,
+        "best@": 2
+    },
+    {
+        "path": "./result/test-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6550416982562547,
+        "best@": 2
+    },
+    {
+        "path": "./result/test-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6550416982562547,
+        "best@": 2
+    },
+    {
+        "path": "./result/test-1/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.6550416982562547,
+        "best@": 2
+    },
+    {
+        "path": "./result/test-2/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.825,
+        "best@": 1
+    },
+    {
+        "path": "./result/test-3/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8097222222222222,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-mixed-math/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8303571428571429,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8841145833333334,
+        "best@": 3
+    },
+    {
+        "path": "./result/llama-temperature0/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8097043214556482,
+        "best@": 1
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9302501895375285,
+        "best@": 4
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9150871872630781,
+        "best@": 3
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9150871872630781,
+        "best@": 3
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8817285822592873,
+        "best@": 2
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9150871872630781,
+        "best@": 3
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9150871872630781,
+        "best@": 3
+    },
+    {
+        "path": "./result/llama-temperature1/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9302501895375285,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8809523809523809,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8081880212282032,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8081880212282032,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8529188779378317,
+        "best@": 2
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.869598180439727,
+        "best@": 3
+    },
+    {
+        "path": "./result/diverse-gsm8k/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8857142857142857,
+        "best@": 4
+    },
+    {
+        "path": "./result/llama-temperature1-prompt-math/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9461713419257013,
+        "best@": 4
+    },
+    {
+        "path": "./result/llama-temperature0-prompt-math/result_0.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8377558756633814,
+        "best@": 2
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.527379949452401,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.527379949452401,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.527379949452401,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.514743049705139,
+        "best@": 3
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.514743049705139,
+        "best@": 3
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.5080033698399326,
+        "best@": 2
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.4709351305812974,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-math-new/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.5433866891322662,
+        "best@": 5
+    },
+    {
+        "path": "./result/llama-zeroshot-math/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.6099410278011794,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-math-New/result_0.json",
+        "dataset": "math",
+        "accuracy": 0.625,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-gsm8k-new/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8574677786201668,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-gsm8k-1.3-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9053763440860215,
+        "best@": 5
+    },
+    {
+        "path": "./result/diverse-gsm8k-new/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8574677786201668,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-gsm8k-new/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8574677786201668,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-gsm8k-1-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9158780231335436,
+        "best@": 5
+    },
+    {
+        "path": "./result/diverse-gsm8k-1-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9158780231335436,
+        "best@": 5
+    },
+    {
+        "path": "./result/diverse-gsm8k-1.3-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9053763440860215,
+        "best@": 5
+    },
+    {
+        "path": "./result/diverse-gsm8k-0.4-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9211523881728583,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-gsm8k-1.0-0.9/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9279757391963609,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-math-1.0-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.5223880597014925,
+        "best@": 2
+    },
+    {
+        "path": "./result/diverse-math-New/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.625,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-gsm8k-0.7-0.4/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9173616376042456,
+        "best@": 6
+    },
+    {
+        "path": "./result/diverse-math-1.0-0.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7285714285714285,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-math-1.0-1.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7947089947089947,
+        "best@": 4
+    },
+    {
+        "path": "./result/diverse-math-0.0-0.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.866565579984837,
+        "best@": 1
+    },
+    {
+        "path": "result/diverse-math-1.0-1.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.975,
+        "best@": 6
+    },
+    {
+        "path": "result/diverse-math-1.0-1.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.975,
+        "best@": 5
+    },
+    {
+        "path": "./result/diverse-math-1.3-0.4-2/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8346153846153846,
+        "best@": 1
+    },
+    {
+        "path": "./result/diverse-math-0.0-0.0/result.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.624262847514743,
+        "best@": 1
+    },
+    {
+        "path": "result/diverse-math-1.0-0.0/1.json",
+        "dataset": "math",
+        "accuracy": 0.7270429654591407,
+        "best@": 6
+    },
+    {
+        "path": "result/diverse-math-1.0-1.0/1.json",
+        "dataset": "math",
+        "accuracy": 0.80625,
+        "best@": 6
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9053763440860215,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.95,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.954510993176649,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-math-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9544642857142858,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-math-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9552691432903715,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8559514783927218,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-math-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9552691432903715,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-math-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7203032855939343,
+        "best@": 6
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9438968915845337,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9552691432903715,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9408642911296436,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/test.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8476118271417741,
+        "best@": 4
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.954510993176649,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9408642911296436,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8476118271417741,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-math-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.7203032855939343,
+        "best@": 6
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8229166666666666,
+        "best@": 1
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8416666666666667,
+        "best@": 2
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8227272727272728,
+        "best@": 2
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8476118271417741,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9552691432903715,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8476118271417741,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8227272727272728,
+        "best@": 3
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.954510993176649,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9408642911296436,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0-3/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9438968915845337,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8218347232752085,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.95,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-1.0-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.975,
+        "best@": 9
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.94375,
+        "best@": 9
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.95,
+        "best@": 5
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.96875,
+        "best@": 9
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.94375,
+        "best@": 9
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.94375,
+        "best@": 9
+    },
+    {
+        "path": "result/diverse-gsm8k-1.3-0.4-2/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.9640625,
+        "best@": 10
+    },
+    {
+        "path": "result/diverse-gsm8k-1.0-0.0-new/1.json",
+        "dataset": "gsm8k",
+        "accuracy": 0.8218347232752085,
+        "best@": 5
+    }
+]

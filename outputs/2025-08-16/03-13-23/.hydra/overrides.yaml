@@ -1,0 +1,6 @@
+- model_name=llama3.1@8b
+- output_path=./result/diverse-math-1.0-1.0
+- dataset=math
+- number=0
+- tp1=1.0
+- tp2=1.0

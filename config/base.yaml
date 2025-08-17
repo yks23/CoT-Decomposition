@@ -1,0 +1,15 @@
+model_name: qwen2.5@7b                 # Name of the model to use
+use_api: false                             # Use API for inference
+use_prompt: true                          # Use prompt for inference
+output_path: result                      # Path to save the output results
+batch_size: 80                             # Batch size for processing questions
+max_new_tokens: 2048                       # Maximum number of new tokens to generate
+max_thread_num: 8                          # Maximum number of threads for API calls
+prompt_path: ./preverification/zero-prompt2  # Path to the prompt file
+result_path: ./${output_path}/${dataset}_${tp1}_${tp2}/result_${number}.json        # Path to the result JSON file
+dataset: "gsm8k"                           # Name of the dataset to use
+repeat: 1                                  # Repeat number per experiment
+tp1: 1.0                                   # Temperature phase 1
+tp2: 1.0                                   # Temperature phase 2
+number: 1
+static_path: ./static.json

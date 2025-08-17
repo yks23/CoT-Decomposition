@@ -1,0 +1,5 @@
+- model_name=llama3.1@8b
+- output_path=./result/diverse-gsm8k-1.0-0.4
+- number=5
+- tp1=1.0
+- tp2=0.4

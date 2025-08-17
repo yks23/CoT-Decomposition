@@ -1,0 +1,1 @@
+python call_llm.py --model_name "Qwen/Qwen2.5-7B-Instruct" --use_prompt --use_api --output_path "./result/qwen2.5-7b-api-prompt"

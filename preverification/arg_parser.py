@@ -1,0 +1,18 @@
+import argparse
+def get_args():
+    arg_parser = argparse.ArgumentParser(description="Argument parser for preverification")
+    arg_parser.add_argument('--model_name', type=str, default='qwen2.5@7b', help='Name of the model to use')
+    arg_parser.add_argument('--use_api', action='store_true', help='Use API for inference')
+    arg_parser.add_argument('--use_prompt', action='store_true', help='Use prompt for inference')
+    arg_parser.add_argument('--output_path', type=str, default='result', help='Path to save the output results')
+    arg_parser.add_argument('--batch_size', type=int, default=80, help='Batch size for processing questions')
+    arg_parser.add_argument('--max_new_tokens', type=int, default=2048, help='Maximum number of new tokens to generate')
+    arg_parser.add_argument('--max_thread_num', type=int, default=8, help='Maximum number of threads for API calls')
+    arg_parser.add_argument('--prompt_path', type=str, default='./preverification/zero-prompt', help='Path to the prompt file')
+    arg_parser.add_argument('--result_path', type=str, default='./result/result.json', help='Path to the result JSON file')
+    arg_parser.add_argument('--dataset', type=str, default='gsm8k', help='Name of the dataset to use')
+    arg_parser.add_argument('--temperature_strategy', type=int, default=0, help='Temperature strategy for generation (0: constant 0.0, 1: high to low, 2: low to high, 3: constant 1.0)')
+    arg_parser.add_argument('--repeat', type=int, default=1, help='repeat number per 1 experiment')
+    arg_parser.add_argument('--tp1', type=float, default=1)
+    arg_parser.add_argument('--tp2', type=float, default=1, help='Temperature for the second phase of generation')
+    return arg_parser.parse_args()

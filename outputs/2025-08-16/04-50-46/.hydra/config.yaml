@@ -1,0 +1,15 @@
+model_name: qwen2.5@7b
+use_api: false
+use_prompt: false
+output_path: result
+batch_size: 80
+max_new_tokens: 2048
+max_thread_num: 8
+prompt_path: ./preverification/zero-prompt2
+result_path: result/diverse-math-1.0-1.0/1.json
+dataset: math
+repeat: 1
+tp1: 1.0
+tp2: 1.0
+number: 1
+static_path: ./static.json

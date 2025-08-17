@@ -1,0 +1,15 @@
+model_name: llama3.1@8b
+use_api: false
+use_prompt: true
+output_path: ./result/diverse-gsm8k-1.0-0.0-new
+batch_size: 80
+max_new_tokens: 2048
+max_thread_num: 8
+prompt_path: ./preverification/zero-prompt2
+result_path: ./${output_path}/${dataset}_${tp1}_${tp2}/result_${number}.json
+dataset: gsm8k
+repeat: 1
+tp1: 1.0
+tp2: 0.0
+number: 4
+static_path: ./static.json

@@ -1,0 +1,1 @@
+python call_llm.py --model_name "mistral@7b" --use_prompt --output_path "./result/mistral-local-prompt"

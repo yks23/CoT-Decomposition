@@ -1,0 +1,9 @@
+You must output the solution in the following structured format:
+
+<thinking>(
+  <stochastic> A brief and intuitive idea for solving the problem (≤ 20 tokens, diverse in phrasing)
+  <deterministic> A clear and correct step-by-step explanation to reach the final answer
+)<\thinking>
+<answer>\boxed{Final concise answer,no latex, no math symbols, no explanation, just a number}
+
+Question is :
