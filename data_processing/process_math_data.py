@@ -3,13 +3,13 @@ import re
 import sys
 import json
 import traceback
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, concatenate_datasets
 from openai import OpenAI
 from tqdm import tqdm
-from multiprocessing import Pool, freeze_support
+from multiprocessing import Pool, freeze_support, Manager
 
 # --- 1. 配置 ---
-NUM_PROCESSES = 64
+NUM_PROCESSES =  50
 API_KEY = os.environ.get("SILICONFLOW_API_KEY")
 if not API_KEY:
     print("错误：请设置 SILICONFLOW_API_KEY 环境变量。")
@@ -20,152 +20,136 @@ client = OpenAI(
     base_url="https://api.siliconflow.cn/v1",
 )
 
-MODEL_TO_USE = "moonshotai/Kimi-K2-Instruct"
-HF_DATASET_NAME = "open-r1/OpenR1-Math-220k"
+MODEL_TO_USE = "Qwen/Qwen3-32B"
+HF_DATASET_NAME = "deepmath"
 HF_DATASET_CONFIG = "default"
-OUTPUT_FILE = "OpenR1-Math-220k_sft_formatted_v4.parquet"
-PROGRESS_FILE = "progress_v4.jsonl"
+OUTPUT_FILE = "deepmath.parquet"
+PROGRESS_FILE = "progress.jsonl"
 NUM_SAMPLES_TO_PROCESS = None
 
+with open('prompt_1.txt', 'r', encoding='utf-8') as f:
+    prompt_1 = f.read()
+with open('prompt_2.txt', 'r', encoding='utf-8') as f:
+    prompt_2 = f.read()
 # --- 2. 辅助函数 ---
 
-def create_transformation_prompt(question_text, solution_text):
+def create_transformation_prompt(question_text, solution_text, difficulty):
     """为API调用构建高质量的Prompt"""
-    return f"""
-You are an expert in mathematical reasoning and data formatting. Your task is to transform a given math problem's solution into a new, clean format.
-The format MUST be exactly three lines, each starting with a specific tag, with no extra symbols, parentheses, or closing tags:
-<stochastic>A brief and intuitive idea for solving the problem
-<deterministic>A clear and correct step-by-step explanation to reach the final answer
-<answer>The final numerical or symbolic answer
-Here is an example:
-Original Question: Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?
-Original Solution: Natalia sold 48/2 = 24 clips in May. Natalia sold 48+24 = 72 clips altogether in April and May.
-Transformed Output:
-<stochastic>Find May's sales (half of April's), then add them together for the total.
-<deterministic>First, calculate the number of clips sold in May. Since it's half of the 48 clips sold in April, we compute 48 / 2 = 24 clips. Next, to find the total number of clips sold altogether, we add the sales from April and May: 48 + 24 = 72 clips.
-<answer>72
----
-Now, transform the following problem and solution into this exact three-line format.
-Original Question:
-{question_text}
-Original Solution:
-{solution_text}
-Transformed Output:
-"""
-
+    return prompt_1.replace("{question_text}", question_text).replace("{solution_text}", solution_text).replace("{difficulty}", str(difficulty))
+def create_generation_prompt(question_text, solution_text, difficulty):
+    return prompt_2.replace("{question_text}", question_text).replace("{solution_text}", solution_text).replace("{difficulty}", str(difficulty))
 def worker_process(job):
     """这个函数由每个独立的进程执行。"""
-    question, solution_text, final_answer = job
+    question, solution_text, final_answer, difficulty = job
     client = OpenAI(api_key=API_KEY, base_url="https://api.siliconflow.cn/v1")
-    api_prompt = create_transformation_prompt(question, solution_text)
+    api_prompt = create_generation_prompt(question, solution_text, difficulty)  # Pass difficulty
     try:
-        extra_params = { "enable_thinking": True }
+        
+        # import requests
+        # url = "https://api.siliconflow.cn/v1/chat/completions"
+
+        # payload = {
+        #     "model": MODEL_TO_USE,
+        #     "messages": [
+        #         {
+        #             "role": "user",
+        #             "content": api_prompt
+        #         }
+        #     ]
+        # }
+        # headers = {
+        #     "Authorization": f"Bearer {API_KEY}",
+        #     "Content-Type": "application/json"
+        # }
+
+        # response = requests.post(url, json=payload, headers=headers)
+
+        # print(response.json())
+        # transformed_content = response.json()['choices'][0]['message']['content'].strip()
         response = client.chat.completions.create(
             model=MODEL_TO_USE,
             messages=[{"role": "user", "content": api_prompt}],
-            temperature=0.1, max_tokens=2048, extra_body=extra_params
+            temperature=0.7, max_tokens=50000
         )
-        transformed_content = response.choices[0].message.content.strip()
+        transformed_content = response.choices[0].message.content.strip()+response.choices[0].message.think_content.strip()
         return {
             "status": "success", "question": question,
-            "transformed_content": transformed_content, "final_answer": str(final_answer)
+            "transformed_content": transformed_content, 'answer': final_answer
         }
     except Exception as e:
+        print(f"Error processing {question}: {e}")
         return {"status": "failure"}
 
 # --- 3. 主执行逻辑 ---
 if __name__ == "__main__":
     freeze_support()
+    completed_solution = []
+    processed = set()
     print("--- 开始数据转换流程 (可续跑模式, V4格式) ---")
     
-    completed_questions = set()
     if os.path.exists(PROGRESS_FILE):
         print(f"发现进度文件 {PROGRESS_FILE}，正在读取已完成的任务...")
         with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
             for line in f:
-                try:
-                    data = json.loads(line)
-                    match = re.search(r"^question: (.*?)\n<thinking>", data['text'], re.DOTALL)
-                    if match:
-                        completed_questions.add(match.group(1).strip())
-                except (json.JSONDecodeError, KeyError):
-                    continue
-        print(f"已加载 {len(completed_questions)} 个已完成的任务。")
+                data = json.loads(line)
+                processed.add(data['question'] + data['solution'])
+        print(f"已加载 {len(processed)} 个已完成的任务。")
 
     print(f"正在从Hugging Face加载数据集: {HF_DATASET_NAME} (配置: {HF_DATASET_CONFIG})")
-    full_dataset = load_dataset(HF_DATASET_NAME, HF_DATASET_CONFIG)
-    original_dataset = full_dataset['train']
+    dss = [Dataset.from_parquet(f'../d/train-0000{i}-of-00010.parquet') for i in range(10)]
     
-    dataset_to_process = original_dataset
-    if NUM_SAMPLES_TO_PROCESS is not None:
-        dataset_to_process = original_dataset.select(range(NUM_SAMPLES_TO_PROCESS))
-
+    # Concatenate datasets using the correct method
+    dataset_to_process = concatenate_datasets(dss)
+    print(dataset_to_process[0])
+    
+    processed_before = len(completed_solution)
+    
     jobs = []
-    for entry in tqdm(dataset_to_process, desc="正在准备任务"):
-        question = entry.get('problem')
-        if question and question.strip() in completed_questions:
-            continue
-        solution_text = entry.get('solution')
-        final_answer = entry.get('answer')
-        if question and solution_text and final_answer is not None:
-            jobs.append((question, solution_text, final_answer))
-
+    
+    for item in dataset_to_process:
+        # print(item)
+        question = item['question']
+        solution_text_1 = item['r1_solution_1']
+        solution_text_2 = item['r1_solution_2']
+        solution_text_3 = item['r1_solution_3']
+        final_answer = item['final_answer']
+        
+        if (question, solution_text_1) not in processed:
+            jobs.append((question, solution_text_1, final_answer, item['difficulty']))
+        if (question, solution_text_2) not in processed:
+            jobs.append((question, solution_text_2, final_answer, item['difficulty']))
+        if (question, solution_text_3) not in processed:
+            jobs.append((question, solution_text_3, final_answer, item['difficulty']))
+        
+    all_data = []
+    last_save=0
     if not jobs:
         print("所有任务都已完成，或没有新的有效任务。")
     else:
         print(f"准备了 {len(jobs)} 个新的有效任务，现在开始并行处理...")
-        with Pool(processes=NUM_PROCESSES) as pool, open(PROGRESS_FILE, 'a', encoding='utf-8') as f_progress:
+        
+        # Using Manager to handle shared data like `processed`
+        with Manager() as manager, Pool(processes=NUM_PROCESSES) as pool, open(PROGRESS_FILE, 'a', encoding='utf-8') as f_progress:
             for result in tqdm(pool.imap_unordered(worker_process, jobs), total=len(jobs), desc="正在并行转换"):
+                print(result['status'])
                 if result and result['status'] == 'success':
-                    final_answer = result['final_answer']
                     transformed_content = result['transformed_content']
                     question = result['question']
-                    
-                    # 修正: 使用 lambda 函数进行替换，彻底避免转义和引用问题
-                    if re.search(r'^<answer>', transformed_content, re.MULTILINE):
-                        transformed_content = re.sub(
-                            r'^(<answer>).*$',
-                            lambda m: m.group(1) + final_answer,
-                            transformed_content,
-                            flags=re.MULTILINE
-                        )
-                    else:
-                        transformed_content += f"\n<answer>{final_answer}"
-                    
-                    sft_text_blob = (
-
-                        "For each problem, you must output the solution in the following structured format:\n\n"
-                        "<stochastic>A brief and intuitive idea for solving the problem\n"
-                        "<deterministic>A clear and correct step-by-step explanation to reach the final answer\n"
-                        "<answer>Final concise answer\n\n"
-                        "Now solve the following problem:\n\n"
-                        f"Q: {question}\n\n"
-                        f"{transformed_content}"
-                    )
-                    f_progress.write(json.dumps({"text": sft_text_blob}) + '\n')
+                    solution = result['transformed_content']
+                    answer = result['answer']
+                    all_data.append({
+                        "question": question,
+                        "solution": solution,
+                        "answer": answer
+                    })
+                    print(len(all_data)-last_save)
+                    if len(all_data)-last_save >= 100:
+                        print(f"已成功处理 {len(all_data)} 条数据，最新问题: {question[:2]}...")
+                        f_progress.write(json.dumps(all_data[-(len(all_data)-last_save):], ensure_ascii=False) + '\n')
+                        f_progress.flush()
+                        last_save = len(all_data)
     
     print("\n--- 数据转换全部完成！ ---")
-
-    print(f"正在从进度文件 {PROGRESS_FILE} 生成最终的 Parquet 文件...")
-    processed_results = []
-    if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    processed_results.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-    
-    if not processed_results:
-         print("\n错误：最终没有成功处理任何数据。")
-         sys.exit(1)
-
-    print(f"\n成功处理数据条目总数: {len(processed_results)}")
-    
-    print("\n正在创建新的Dataset对象...")
-    final_dataset = Dataset.from_list(processed_results)
-    
-    print(f"正在将数据集保存到 Parquet 文件: {OUTPUT_FILE}")
-    final_dataset.to_parquet(OUTPUT_FILE)
-
-    print(f"\n成功！最终文件已保存在: {os.path.abspath(OUTPUT_FILE)}")
+    dataset = Dataset.from_list(all_data)
+    print(f"正在保存转换后的数据集到 {OUTPUT_FILE} ...")
+    dataset.to_parquet(OUTPUT_FILE)
