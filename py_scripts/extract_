@@ -1,0 +1,6 @@
+import json
+if __name__ == "__main__":
+    import datasets
+    from datasets import Dataset
+    dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/gsm8k/dataset-new.parquet")
+    
