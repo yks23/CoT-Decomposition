@@ -55,23 +55,23 @@ def compute_confidence_metrics(confidences, chunk_size=100):
 max_token_dataset = {
     "gsm8k": 1000,
     "math": 1500,
-    "aime24": 3000,
-    "aime25": 3000,
+    "aime24": 6000,
+    "aime25": 6000,
     "amc23": 2000,
     "math500": 1500,
     "minerva": 2000,
-    "olympiad_bench": 3000,
+    "olympiad_bench": 6000,
     "openrl": 1000,
     "dapo": 3000,
 }
 max_batch_size ={
     "gsm8k": 20,
-    "math": 10,
+    "math": 20,
     "aime24": 5,
     "aime25": 5,
-    "amc23": 10,
-    "math500": 10,
-    "minerva": 10,
+    "amc23": 15,
+    "math500": 15,
+    "minerva": 15,
     "olympiad_bench": 5,
     "openrl": 20,
     "dapo": 5,
@@ -189,23 +189,29 @@ class EntropyCalculator:
         tokens, entropies,confidences = sample
         
         start_id = self.get_token_id(start_token)
-        end_id = self.get_token_id(end_token)
-        
         # 找到开始位置
         if start_token == 'begin':
             start_idx = 0
+            
         elif start_id in tokens:
             start_idx = tokens.index(start_id)
         else:
             return None  # 开始标记不存在
         
-        # 找到结束位置
         if end_token == 'end':
-            end_idx = len(tokens) - 1
-        elif end_id in tokens:
+            end_id = self.tokenizer.eos_token_id
+        else:
+            end_id = self.get_token_id(end_token)
+            
+        if end_id in tokens:
             end_idx = tokens.index(end_id)
         else:
-            return None  # 结束标记不存在
+            return None
+        
+        if self.tokenizer.eos_token_id in tokens:
+            valid_end_pos = tokens.index(self.tokenizer.eos_token_id)
+        else:
+            valid_end_pos = len(tokens) - 1
         
         # 确保结束位置在开始位置之后
         if end_idx <= start_idx:
@@ -227,7 +233,9 @@ class EntropyCalculator:
             "start_idx": start_idx,
             "end_idx": end_idx,
             "max_step": max_step,
-            "confidences": compute_confidence_metrics(confidences[start_idx:end_idx + 1])
+            "confidences": compute_confidence_metrics(confidences[start_idx:end_idx + 1]),
+            "entropies": entropies[0:valid_end_pos + 1],
+            "confidences_all": confidences[0:valid_end_pos + 1],
         }
     
     def calculate_batch_entropy_stats(self, sample,start_token, end_token):
@@ -476,7 +484,7 @@ def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
             )
             key = f"{start_token}_{end_token}"
             entropy_stats[key] = stats
-
+    # torch.save(all_entropies, 'entropies.pt')
     # 逐题评估
     results = []
     success_avg, success_best, format_avg = 0, 0, 0
@@ -576,7 +584,8 @@ def get_distributed_dataloader(dataset, batch_size, rank, world_size):
 # ======================
 # 结果合并
 # ======================
-def merge_results_from_all_ranks(save_path, seed, world_size):
+
+def merge_results_from_all_ranks(save_path, seed, world_size,save_head=False):
     if torch.distributed.get_rank() != 0:
         return
         
@@ -619,6 +628,21 @@ def merge_results_from_all_ranks(save_path, seed, world_size):
                                 "avg_entropy_per_token": (old_stats["avg_entropy_per_token"] * old_stats["sample_count"] + stats["avg_entropy_per_token"] * stats["sample_count"]) / total_sample_count,
                                 "sample_count": total_sample_count
                             }
+    entropies=[]
+    for result in all_results:
+        avg_success = result.get("avg_success", 0)
+        success_entropy = -avg_success*torch.log(torch.tensor(avg_success) + 1e-8) - (1 - avg_success)*torch.log(torch.tensor(1 - avg_success) + 1e-8)
+        entropies.append(success_entropy.item())
+    all_static['success_entropy'] = sum(entropies)/len(entropies) if len(entropies) > 0 else 0
+    
+    if save_head:
+        q2a = {}
+        for result in all_results:
+            question = result['question']
+            answer = result['samples'][0]['full_text']
+            q2a[question] = answer
+        with open(os.path.join(save_path, f"q2a.json"), "w") as f:
+            json.dump(q2a, f, ensure_ascii=False, indent=4)
     
     # 保存合并后的结果
     if all_results:
@@ -636,6 +660,7 @@ def merge_results_from_all_ranks(save_path, seed, world_size):
 # ======================
 # 主控
 # ======================
+
 @hydra.main(version_base=None, config_path="config", config_name="eval")
 def eval_main(cfg):
     # 初始化分布式
@@ -660,7 +685,7 @@ def eval_main(cfg):
         if cfg.eval.batch_size == -1:
             batch_size = max_batch_size.get(dataset_name, 10)
         else:
-            batch_size = cfg.eval.batch_size
+            batch_size = cfg.eval.batch_size // cfg.eval.sample_num  # 每个rank的batch size
         if cfg.eval.max_new_tokens == -1:
             max_tokens = max_token_dataset.get(dataset_name, 1000)
         else:
@@ -691,6 +716,8 @@ def eval_main(cfg):
             batch_data = subset[i:i + batch_size]
             # guidelines = [d.get('correct_explorations', []) for d in batch_data]
             guidelines = [d.get('exploration', '') for d in batch_data]
+            
+            
             # 随机选择一条
             # import random
             # guidelines = [random.choice(g) if len(g) > 0 else "" for g in guidelines]
@@ -703,9 +730,14 @@ def eval_main(cfg):
                     enable_thinking=cfg.eval.get("enable_thinking", False)
                 ) + cfg.eval.get("solution_prefix", "").replace("<guideline>", g)
                 for q, g in zip(batch_data, guidelines)
-                
             ]
-            print(questions[0])
+            
+            if cfg.eval.get("head_path", None) is not None:
+                with open(cfg.eval.head_path, "r") as f:
+                    head_dict = json.load(f)
+                questions = [q+head_dict.get(q, questions[idx]) for idx, q in enumerate(questions)]
+            
+            # print(questions[0])
             gt_answers = [d["answer"] for d in batch_data]
 
             # === 多次采样 ===
@@ -740,7 +772,6 @@ def eval_main(cfg):
                     else:
                         old_stats = static["entropy_stats"][key]
                         total_samples = old_stats["sample_count"] + new_stats["sample_count"]
-                        
                         if total_samples > 0:
                             static["entropy_stats"][key] = {
                                 "avg_length": (old_stats["avg_length"] * old_stats["sample_count"] + new_stats["avg_length"] * new_stats["sample_count"]) / total_samples,
@@ -767,7 +798,7 @@ def eval_main(cfg):
         torch.distributed.barrier()
         
         # 合并所有rank的结果
-        merge_results_from_all_ranks(save_path, cfg.eval.seed, world_size)
+        merge_results_from_all_ranks(save_path, cfg.eval.seed, world_size,cfg.eval.get('save_head', False))
         
         if bar is not None:
             bar.close()
@@ -784,3 +815,7 @@ if __name__ == "__main__":
     
 #  torchrun --nproc_per_node=8 --nnodes=1 --node_rank=0 eval.py --config-path config --config-name eval-rl
 
+"""
+usage:
+torchrun --nproc_per_node=8 --nnodes=1 --node_rank=0
+"""

@@ -33,7 +33,7 @@ def run_inference(local_rank, rank, world_size, datasets,args):
         batch_size = 25
     elif 'exploration' in args.savekey:
         max_new_tokens = 500
-        batch_size = 50
+        batch_size = 10
         prompt_template = r"""You are a precise math solver.
 For each problem, I will give you a question and a detailed solution.
 Your task is to write a **short and clear step-by-step guideline** for solving the problem.
@@ -196,5 +196,7 @@ torchrun --nproc_per_node=8 infer.py --dataset ./dataset/s1k/s1k-new.parquet --o
 torchrun --nproc_per_node=8 infer.py --dataset ./dataset/s1k/s1k-new.parquet --output ./dataset/s1k/s1k-new.json --savekey exploration1 --contentkey execution1 && torchrun --nproc_per_node=8 infer.py --dataset ./dataset/s1k/s1k-new.parquet --output ./dataset/s1k/s1k-new.json --savekey exploration2 --contentkey execution2
 
 torchrun --nproc_per_node=8 infer.py --dataset ./dataset/openrl/all_filtered.parquet --output ./dataset/openrl/qwen.json --savekey execution && torchrun --nproc_per_node=8 infer.py --dataset ./dataset/openrl/all_filtered.parquet --output ./dataset/openrl/qwen.json --savekey exploration --contentkey execution
+
+torchrun --nproc_per_node=4 infer.py --dataset ./dataset/qwen6/raw.parquet --output ./dataset/qwen6/raw.json --savekey exploration --contentkey execution
 
 """
