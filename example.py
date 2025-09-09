@@ -124,9 +124,9 @@ if __name__ == "__main__":
         answers = do_test_sample(model,tokenizer,test_question_2)
     if Test_Type == "rl":
         model, tokenizer = load_raw_model(**cfg_rl)
-        model.save_pretrained("./rl-400")
-        tokenizer.save_pretrained("./rl-400")
-        test_question = "Problem: Compute S = sum from n=1 to infinity of 1 / [n²(n+1)]."
+        # model.save_pretrained("./rl-400")
+        # tokenizer.save_pretrained("./rl-400")
+        test_question = "Problem: Compute S = sum from n=1 to infinity of 1 / [n²(n+1)].For these problem, you need to provide 2 different solutions methos, and combine them. notice that only one solution is not enough"
         # test_question = "Please answer the following multiple-choice question:\nAll of following are true about measles except -?\nA. Maximum incidence in 6m-3 year age group\nB. Best age for immunization is 9-12 months\nC. Secondary attack rate is 30%\nD. I.P. = 7-14 days. Provide the answer index step by step, give the answer in boxed"
         message = [
             {"role": "user", "content": test_question}
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         
         print(message)
         input_str = tokenizer.apply_chat_template(message,enable_thinking=False,tokenize=False,add_generation_prompt=True)
-        input_str += "<EXPLORATION>I need to make a step-by-step plan. 1. refactor the equation. 2. use partial fraction decomposition. 3. find the general term of the series. 4. calculate the sum of the series.<EXECUTION>"
+        input_str += "<EXPLORATION>"
         # input_str += r"""""
         input_str = [input_str]
         # stop_token = "<EXECUTION>"

@@ -81,6 +81,25 @@ def calculate_frac(s: str) -> float:
             return numerator / denominator
     return None
 
+import re
+
+def shift_numbered_list(text: str, k: int) -> str:
+    """
+    将文中形如 '1. ', '2. ' 的序号整体加上 k
+    
+    参数:
+        text (str): 输入文本
+        k (int): 偏移量
+        
+    返回:
+        str: 修改后的文本
+    """
+    def replacer(match):
+        num = int(match.group(1))
+        return f"{num + k}. "
+    
+    return re.sub(r'\b(\d+)\.\s', replacer, text)
+
 def normalize_final_answer(final_answer: str) -> str:
         """Normalize a final answer to a quantitative reasoning question.
 

@@ -13,6 +13,7 @@ from reward import normalize_final_answer,extract_boxed_content
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch.nn.functional as F
+from reward import shift_numbered_list
 from visualize import plot_by_task_samples
 from batchconfig import max_token_dataset, max_batch_size, is_multi_choice, load_dataset_by_name
 from model import EntropyCalculator,check_resume, load_model
@@ -115,7 +116,6 @@ def generate_and_compute_entropy(
         return all_results
     else:
         return [all_results[i][0] for i in range(len(all_results))]
-
 
 
 def calculate_entropy(token_logprob_dict):
@@ -245,6 +245,18 @@ def multi_choice_evaluate(pred, gt):
     return False
     
     
+    
+def boxed_evaluate(pred, gt):
+    gt,p_float = normalize_final_answer(gt)
+    pre_answer = ""
+    # find every boxed and compare with gt
+    for pre_answer in extract_boxed_content(pred):
+        pre_answer, q_float = normalize_final_answer(pre_answer)
+        if pre_answer == gt or (q_float is not None and q_float == p_float):
+            return True , pre_answer
+    return False , pre_answer
+
+
 def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
     """
     samples: List[ (tokens, entropies) ]  # 每次采样的结果
@@ -302,15 +314,8 @@ def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
                 succ = multi_choice_evaluate(pred, gt_answers[i])
                 pre_answer = pred.split("boxed{")[-1]
             else:
-                gt,p_float = normalize_final_answer(gt_answers[i])
-                succ = False
-                pre_answer = ""
-                # find every boxed and compare with gt
-                for pre_answer in extract_boxed_content(full_text):
-                    pre_answer, q_float = normalize_final_answer(pre_answer)
-                    if pre_answer == gt or (q_float is not None and q_float == p_float):
-                        succ = True
-                        break
+                succ,pred_answer = boxed_evaluate(pred, gt_answers[i])
+               
             fmt = check_format(full_text, cfg.eval.checklist)
             per_sample_success.append(succ)
             per_sample_format.append(fmt)
@@ -481,6 +486,39 @@ def merge_results_from_all_ranks(save_path, seed, world_size,save_head=False):
 # ======================
 # 主控
 # ======================
+import re
+def get_max_step(text: str) -> int:
+    """
+    提取文本中的序号步骤，返回最大序号（支持任意位数字）
+
+    Args:
+        text (str): 输入文本
+
+    Returns:
+        int: 文本中最大的序号，如果没有找到返回0
+    """
+    # 匹配任意位数字序号，格式如 1. 或 2)
+    matches = re.findall(r'\b(\d+)[\.\)]', text)
+    numbers = [int(num) for num in matches]
+    return max(numbers) if numbers else 0
+
+def merge_exploration_part(explorations:list[str]):
+    start_str = "I need to make a step-by-step plan. "
+    start_str +=explorations[0]
+    for i in range(1,len(explorations)):
+        e = explorations[i].split('</EXPLORATION>')[0]
+        e = '1. '+explorations[i].split('1. ')[-1]
+        steps = get_max_step(e)
+        steps += 1
+        start_str += f" {steps}. "+ "I will try another method: "
+        start_str += shift_numbered_list(e,steps)
+    all_steps = get_max_step(start_str)
+    if len(explorations)>1:
+        start_str += f" {all_steps}. " + "Combine the above methods and give a final answer in boxed.</EXPLORATION>"
+    else:
+        start_str += "</EXPLORATION>"
+    return start_str
+
 @hydra.main(version_base=None, config_path="config", config_name="eval")
 def eval_main(cfg):
     ddp_setup()
@@ -511,6 +549,19 @@ def eval_main(cfg):
             max_tokens = cfg.eval.max_new_tokens    
         
         save_path = os.path.join(cfg.eval.save_path, dataset_name)
+        
+        if cfg.eval.get("combine_num",0)>1:
+            with open(os.path.join(save_path,'result_0_merged.json'),'r') as f:
+                old_results = json.load(f)
+            q2hint = {}
+            for res in old_results:
+                explorations = [res['samples'][i]['full_text'] for i in range(len(res['samples']))][:cfg.eval.combine_num]
+                explorations = [e.replace('<EXPLORATION>','').replace('</EXPLORATION>','') for e in explorations]
+                hint = merge_exploration_part(explorations)
+                q2hint[res['question']] = hint
+                    
+                    
+        
         os.makedirs(save_path, exist_ok=True)
         if cfg.eval.get('resume', False):
             results, static = check_resume(save_path, cfg.eval.seed, rank)
@@ -575,11 +626,15 @@ def eval_main(cfg):
                 ) + cfg.eval.get("solution_prefix", "").replace("<guideline>", g)
                 for q, g in zip(batch_data, guidelines)
             ]
-            
-            if cfg.eval.get("head_path", None) is not None:
-                with open(cfg.eval.head_path, "r") as f:
-                    head_dict = json.load(f)
-                questions = [q+head_dict.get(q, questions[idx]) for idx, q in enumerate(questions)]
+            print(q2hint)
+            if cfg.eval.get("combine_num",0)>1:
+                for q in questions:
+                    if q in q2hint:
+                        q += q2hint[q]
+                    else:
+                        print(f"Warning: question not in q2hint!")
+                        raise ValueError
+            print(questions[0])
             gt_answers = [d["answer"] for d in batch_data]
 
             # === 多次采样 ===
