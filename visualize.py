@@ -11,8 +11,15 @@ def smooth_curve(seq, chunk_size=5):
     """按 chunk_size 分块取均值"""
     n = len(seq)
     smoothed = []
-    for i in range(0, n, chunk_size):
+    for i in range(0, n):
         smoothed.append(np.mean(seq[i:i+chunk_size]))
+        
+        
+    # # normalize the value to [0,1]
+    # min_val = min(smoothed)
+    # max_val = max(smoothed)
+    # if max_val - min_val > 1e-6:
+    #     smoothed = [(v - min_val) / (max_val - min_val) for v in smoothed]
     return np.array(smoothed)
 
 def load_results(result_path):
@@ -28,6 +35,7 @@ def load_results(result_path):
     else:
         with open(result_path, "r") as f:
             results = json.load(f)
+    print(f"Loaded {len(results)} results from {result_path}")
     return results
 
 def plot_entropy_confidence(all_entropies, all_confidences, output_dir):
@@ -100,62 +108,115 @@ def plot_success_distributions(step_nums, lengths, avg_entropies, avg_confidence
               "Average Entropy per Sequence", "Average Entropy Distribution by Success", "avg_entropy_success.png")
     hist_plot(avg_confidences, avg_confidences[success_flags], avg_confidences[~success_flags],
               "Average Confidence per Sequence", "Average Confidence Distribution by Success", "avg_confidence_success.png")
-from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import torch
-def plot_by_task(results, output_dir, num_tasks=2, smooth_chunk=50):
-    """按题目聚合，画出 num_tasks 个题目的平均轨迹"""
-    task_entropies = []
-    
-    avg_entropy =[-item['avg_success']*torch.log2(torch.tensor(item['avg_success']+1e-10))-(1-item['avg_success'])*torch.log2(torch.tensor(1-item['avg_success']+1e-10)) for item in results]
-    avg_entropy = sum(avg_entropy)/len(avg_entropy)
-    
-    print(f"所有题目的平均熵: {avg_entropy:.4f}")
-    
-    for item in results:  # 每个 item 就是一个题目
-        seqs = []
-       
+
+def plot_by_task_samples(results, output_dir, num_tasks=2, smooth_chunk=30):
+    """
+    为每个任务生成单独的图表，并绘制所有样本的置信度和熵轨迹。
+    置信度轨迹使用红色系，熵轨迹使用蓝色系，并用标记表示成功与否。
+    """
+    task_data = []
+
+    # 预处理数据
+    for item in results:
+        task_samples = []
+        # if item['avg_success'] == 0 or item['avg_success'] == 1:
+            # continue
+        get_correct = False
+        get_wrong = False
         for sample in item["samples"]:
+            # if need_differ and get_wrong and sample['success']==False:
+            #     continue
+            # if need_differ and get_correct and sample['success']==True:
+            #     continue
+            # if need_differ and sample['success']==True:
+            #     get_correct = True
+            # if need_differ and sample['success']==False:
+            #     get_wrong = True
+                
             static = sample["static"]
             if static is None:
                 continue
-            seqs.append(np.array(static["entropies"]))
-        if seqs:
-            task_entropies.append(seqs)
+            
+            # 确保置信度和熵数据存在
+            if "confidences_all" in static and "entropies" in static:
+                task_samples.append({
+                    "confidences": np.array(static["confidences_all"]),
+                    "entropies": np.array(static["entropies"]),
+                    "length": static['length'],
+                    "success": sample.get("success", False)
+                })
+            else:
+                print("No key")
+        
+        # 如果这个任务有数据，则保存
+        if task_samples:
+            task_data.append({
+                "samples": task_samples,
+                "median_length": item.get('avg_length', 0)
+            })
 
-    # 选取前 num_tasks 个题目
-    selected_tasks = task_entropies[:num_tasks]
+    # 选取前 num_tasks 个任务
+    selected_tasks = task_data[:num_tasks]
+    
+    # 定义颜色映射，使用Matplotlib的颜色图
+    cm_reds = plt.get_cmap('Reds')
+    cm_blues = plt.get_cmap('Blues')
+    # 为每个选定的任务创建图表
+    for tid, task in enumerate(selected_tasks, 1):
+        plt.figure(figsize=(12, 6))
+        
+        num_samples = len(task["samples"])
+        
+        # 绘制所有样本的轨迹
+        for i, sample in enumerate(task["samples"]):
+            # 计算颜色，使其在色系中平滑变化
+            color_conf = cm_reds(0.2 + 0.8 * (i / (num_samples - 1) if num_samples > 1 else 0.5))
+            color_ent = cm_blues(0.2 + 0.8 * (i / (num_samples - 1) if num_samples > 1 else 0.5))
 
-    plt.figure(figsize=(12, 6))
-    for tid, seqs in enumerate(selected_tasks, 1):
-        max_len = max(len(seq) for seq in seqs)
-        mat = np.zeros((len(seqs), max_len))
-        mask = np.zeros((len(seqs), max_len))
-        for i, seq in enumerate(seqs):
-            mat[i, :len(seq)] = seq
-            mask[i, :len(seq)] = 1
-        avg_seq = np.sum(mat, axis=0) / np.sum(mask, axis=0)
+            # 根据成功与否选择标记样式
+            marker = 'o' if sample["success"] else 'x'
+            markersize = 8 if sample["success"] else 6
 
-        # 平滑处理：chunk 平均
-        if smooth_chunk > 1:
-            chunked = [
-                np.mean(avg_seq[i:i+smooth_chunk])
-                for i in range(0, len(avg_seq))
-            ]
-            avg_seq = np.array(chunked)
+            # Smooth the curves
+            if len(sample["confidences"]) > smooth_chunk:
+                sample["confidences"] = smooth_curve(sample["confidences"], chunk_size=smooth_chunk)
+            if len(sample["entropies"]) > smooth_chunk:
+                sample["entropies"] = smooth_curve(sample["entropies"], chunk_size=smooth_chunk)
 
-        plt.plot(avg_seq, linewidth=2, label=f"Task {tid}")
+            
+            # 绘制置信度轨迹和标记
+            # plt.plot(sample["confidences"], color=color_conf, linestyle='-', alpha=0.7, label=f"Sample {i+1} - Confidence")
+            # plt.plot(len(sample["confidences"])-1, sample["confidences"][-1], marker=marker, markersize=markersize, color=color_conf)
+            
+            # 绘制熵轨迹和标记
+            plt.plot(sample["entropies"], color=color_ent, linestyle='--', alpha=0.7, label=f"Sample {i+1} - Entropy")
+            plt.plot(len(sample["entropies"])-1, sample["entropies"][-1], marker=marker, markersize=markersize, color=color_ent)
+            
+            # 添加分隔长度线
+            plt.axvline(x=sample["length"], color=color_ent, linestyle=':', alpha=0.5)
+    
+        # 添加图例
+        # 创建两个独立的图例，一个用于轨迹颜色，一个用于标记
+        legend_lines_conf = [plt.Line2D([0], [0], color=cm_reds(0.5), lw=2)]
+        legend_lines_ent = [plt.Line2D([0], [0], color=cm_blues(0.5), lw=2, linestyle='--')]
+        legend_lines_success = [plt.Line2D([0], [0], color='k', marker='o', markersize=8, linestyle='None')]
+        legend_lines_fail = [plt.Line2D([0], [0], color='k', marker='x', markersize=6, linestyle='None')]
 
-    plt.xlabel("Token Index")
-    plt.ylabel("Entropy")
-    plt.title(f"Average Entropy Trajectories of {num_tasks} Tasks")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "task_entropy_trajectories.png"))
-    plt.close()
-
+        legend1 = plt.legend(legend_lines_conf + legend_lines_ent, ["Confidence Trajectories", "Entropy Trajectories"], loc='upper left')
+        plt.gca().add_artist(legend1)
+        
+        legend2 = plt.legend(legend_lines_success + legend_lines_fail, ["Success", "Failure"], loc='upper right')
+        
+        plt.xlabel("Token Index")
+        plt.ylabel("Value")
+        plt.title(f"Confidence and Entropy Trajectories for Task {tid}")
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f"task_{tid}_all_samples_trajectories.png"))
+        plt.close()
 
 def visualize_result_json(cfg):
     result_path = cfg.result_path
@@ -186,7 +247,7 @@ def visualize_result_json(cfg):
 
     plot_entropy_confidence(all_entropies, all_confidences, output_dir)
     plot_success_distributions(step_nums, lengths, avg_entropies, avg_confidences, success_flags, output_dir)
-    plot_by_task(results, output_dir, num_tasks=num_tasks)
+    plot_by_task_samples(results, output_dir, num_tasks=num_tasks)
 
     print(f"✅ 可视化完成，图片保存在: {output_dir}")
 
@@ -196,5 +257,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--result_path", type=str, required=True, help="Path to result")
     parser.add_argument("--output_dir", type=str, required=True, help="Directory to save visualizations")
-    parser.add_argument("--num_tasks", type=int, default=2, help="Number of tasks to plot")
+    parser.add_argument("--num_tasks", type=int, default=5, help="Number of tasks to plot")
     visualize_result_json(parser.parse_args())
+    
+"""
+python visualize.py --result_path ./evaluation/qw/CoT/3000/olympiad_bench --output_dir visualization/long
+"""

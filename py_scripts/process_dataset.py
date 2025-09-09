@@ -1,25 +1,215 @@
 import pandas as pd
 from datasets import Dataset,load_dataset
-from preverification.dataset import get_math
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from util import analyze_token_counts_parallel as calculate_token
+# from preverification.dataset import get_math
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+
+
+"""
+from datasets import load_dataset
+
+# Login using e.g. `huggingface-cli login` to access this dataset
+ds = load_dataset("jaeyong2/Reason-Qwen3-14B-En")
+
+
+from datasets import load_dataset
+
+# Login using e.g. `huggingface-cli login` to access this dataset
+ds = load_dataset("SmallDoge/Qwen3-Long-Reasoning")
+
+extract from them tonight.
+
+"""
+prompt= r"""Solve this Question: <question>\nthink step by step.Give your final answer in the boxed{}.Here is a guideline for you to solve this problem. Please follow it step by step.\n<guideline>"""
 
 # --- 主程序 ---
 if __name__ == "__main__":
-    dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/0000.parquet")
+    import json
+    # dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft.parquet")
+    # print(len(dataset)
+        #   )
     # print(dataset[0])
+    # all_result=[]
+    # for i in range(8):
+    #     path = f"/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft-new.json_rank{i}.json"
+    #     with open(path, 'r') as f:
+    #         dataset = json.load(f)
+    #     all_result += dataset
+    # for i in range(8):
+    #     path = f"/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft-new2.json_rank{i}.json"
+    #     with open(path, 'r') as f:
+    #         dataset = json.load(f)
+    #     all_result += dataset
+    # dataset = Dataset.from_list(all_result)
+    # dataset = Dataset.from_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft-new.parquet')
+    # dataset2  = Dataset.from_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft-new2.parquet')
+    # dataset = [data for data in dataset]
+    # dataset2 = [data for data in dataset2]
+    # merged = Dataset.from_list(dataset + dataset2)
+    # print(len(merged))
+    # print(merged[0])
+    # merged.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qw-sft-new.parquet')
+    # files=[
+    #     "../dataset/reasonmed/reasonmed.json_rank0.json",
+    #     "../dataset/reasonmed/reasonmed.json_rank1.json",
+    #     "../dataset/reasonmed/reasonmed-new.json_rank0.json",
+    #     "../dataset/reasonmed/reasonmed-new.json_rank1.json",
+    # ]
+    
+    # newdataset = []
+    # for file in files:
+    #     with open(file,'r') as f:
+    #         dataset = json.load(f)
+    #     newdataset += dataset
+    # print(len(newdataset))
+    # newdataset = Dataset.from_list(newdataset)
+    newdataset=Dataset.from_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/reasonmed/reasonmed-sft.parquet')
+    
+    subset_50000 = newdataset.shuffle(seed=42).select(range(50000))
+    
+    subset_50000.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/reasonmed/reasonmed-sft-small.parquet')
+    
+    # with open("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/reasonmed/reasonmed.json_rank0.json",'r') as f:
+        # dataset = json.load(f)
+    # prompts = [data['question'] for data in dataset]
+    # all_tokens = calculate_token(prompts, '/home/fit/alex/.cache/modelscope/hub/models/Qwen/Qwen3-8B')
+    # print(f"总token数: {all_tokens}")
+    
+    # response = [data['response'] for data in dataset]
+    # all_tokens = calculate_token(response, '/home/fit/alex/.cache/modelscope/hub/models/Qwen/Qwen3-8B')
+    # print(f"总token数: {all_tokens}")
+    
+    # cot = [data['cot'] for data in dataset]
+    # all_tokens = calculate_token(cot, '/home/fit/alex/.cache/modelscope/hub/models/Qwen/Qwen3-8B')
+    # print(f"总token数: {all_tokens}")
+    
+    # exp = [data['exploration'] for data in dataset]
+    # all_tokens = calculate_token(exp, '/home/fit/alex/.cache/modelscope/hub/models/Qwen/Qwen3-8B')
+    # print(f"总token数: {all_tokens}")
+    
+    # result_files= [f"../evaluation/qw/new-short-270/olympiad_bench/static_0_rank{i}.json" for i in range(8)]
+    # statis=[]
+    # best_statis = []
+    # all1 =0
+    # all2 =0
+    # import json
+    # for result_file in result_files:
+    #     with open(result_file, 'r') as f:
+    #         results = json.load(f)
+    #     statis.append(results['avg_success']*results['all_number'])
+    #     best_statis.append(results['best_success']*results['all_number'])
+    #     all1+=results['all_number']
+    #     all2+=results['all_number']
+    # print("avg:",sum(statis)/all1)
+    # print("best:",sum(best_statis)/all2)
+    # import json
+    # result_file = "../evaluation/qw-dapo/dapo/result_0_merged.json"
+    # with open(result_file, 'r') as f:
+    #     results = json.load(f)
+    
+    
+    # dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/qwen-rl.parquet")
+    # new_set = dataset.shuffle(seed=42).select(range(500))
+    # new_set.to_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/qwen-rl-valid.parquet")
+    # print(len(new_set))
+    # print(dataset[25]['prompt'])
+    # print(dataset[25]['exploration'])
+
+    # new_dataset = []
+    # for result, data in zip(results, dataset):
+    #     data['exploration'] = [s['full_text'] for s  in result['samples']]
+    #     new_dataset.append(data)
+    # print(new_dataset[0])
+    # new_dataset = Dataset.from_list(new_dataset)
+    # new_dataset.to_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/qwen-rl.parquet")
+    # from modelscope.msdatasets import MsDataset
+    # ds =  MsDataset.load('AI-ModelScope/ReasonMed')
+    # print(len(ds))
+    # print(ds[0])
+    # dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/qwen.parquet")
+    # print(len(dataset))
+    # from modelscope.msdatasets import MsDataset
+    # ds =  MsDataset.load('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/medqa', subset_name='med_qa_en_source', split='test')
+    
+    # import json
+    
+    # from datasets import load_dataset
+    # for subname in ['clinical_knowledge','college_biology','college_medicine','medical_genetics','professional_medicine','anatomy']:
+    #     dataset = load_dataset("cais/mmlu", subname)['test']
+    #     newdataset =  []
+    # # dataset = Dataset.from_parquet("/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/pubmedqa/raw.parquet")
+        
+    #     for data in dataset:
+    #         question = data['question']
+    #         choice = data['choices']
+    #         gt_answer = data['choices'][data['answer']]
+    #         for i,opt in zip(['A','B','C','D'],choice):
+    #             question += f"\n{i}. {opt}"
+                
+    #         newdataset.append({
+    #             "question": question,
+    #             "answer": {
+    #                 "answer": gt_answer,
+    #                 "answer_idx": ['A','B','C','D'][data['answer']],
+    #             }})
+    #     newdataset = Dataset.from_list(newdataset)
+    #     newdataset.to_parquet(f'/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/mmlu/{subname}.parquet')
+    #     print(len(newdataset))
+    #     print(newdataset[0])
+    # for data in dataset:
+    #     question = data['question']
+    #     for opt in ['opa','opb','opc','opd']:
+    #         big_Case = opt.upper()[-1]
+    #         question += f"\n{big_Case}. {data[opt]}"
+
+    #     choice = ['a','b','c','d'][data['cop']]
+        
+    #     newdataset.append({
+    #         "question": question,
+    #         "answer": {
+    #             "answer": data['op'+choice],
+    #             "answer_idx": choice.upper(),  
+    #         }})
+    # newdataset = Dataset.from_list(newdataset)
+    # newdataset.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/pubmedqa/processed.parquet')
+    # print(len(newdataset))
+    # print(newdataset[0])
+    # import json
+    # newdataset = []
+    # with open("../dataset/reasonmed/CoTMed.json",'r') as f:
+    #     CoT_dataset = json.load(f)
+    # with open("../dataset/reasonmed/ResponseMed.json",'r') as f:
+    #     Response_dataset = json.load(f)
+    # for data1,data2 in zip(CoT_dataset,Response_dataset):
+    #     newdataset.append({
+    #         "question":data1['instruction'],
+    #         "cot":data1['output'],
+    #         "response":data2['output']
+    #     })
+    # newdataset = Dataset.from_list(newdataset)
+    # newdataset.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/reasonmed/reasonmed.parquet')
+    
+    # for 
+    # print(len(newdataset))
+    
+    
+    
+    # # print(dataset[0].keys())
+    # # print(dataset[0])
+    # # print(dataset[0])
     # dic ={}
-    newdataset = []
-    for data in dataset:
-        newdataset.append(
-            {
-                "question": data['prompt'],
-                "answer":data['reward_model']['ground_truth'],
-            }
-        )
-    newdataset = Dataset.from_list(newdataset)
-    newdataset.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/eval.parquet')
-    print(len(newdataset))
-    print(newdataset[0])
+    # newdataset = []
+    # for data in dataset:
+    #     newdataset.append(
+    #         {
+    #             "question": data['content'],
+    #             "execution":data['text'],
+    #         }
+    #     )
+    # newdataset = Dataset.from_list(newdataset)
+    # newdataset.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/qwen6/raw.parquet')
+    # print(len(newdataset))
+    # print(newdataset[0])
     
     # valid_set = newdataset.shuffle(seed=42).select(range(500))
     # valid_set.to_parquet('/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/qwen-valid.parquet')

@@ -2,292 +2,30 @@ import os
 import json
 import hydra
 import torch
+from vllm import LLM, SamplingParams
+from typing import List, Tuple
 import tqdm
 import statistics
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
-from reward import normalize_final_answer
+from reward import normalize_final_answer,extract_boxed_content
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch.nn.functional as F
-
+from visualize import plot_by_task_samples
+from batchconfig import max_token_dataset, max_batch_size, is_multi_choice, load_dataset_by_name
+from model import EntropyCalculator,check_resume, load_model
 # ======================
 # 分布式初始化
 # ======================
 def ddp_setup():
     init_process_group(backend="nccl")
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
-import numpy as np
-
-def compute_confidence_metrics(confidences, chunk_size=100):
-    """
-    输入:
-        confidences: list/ndarray, 每个token的confidence
-        chunk_size: int, 每chunk的长度
-    
-    输出:
-        dict, 包含四个指标
-    """
-    confidences = np.array(confidences)
-    n = len(confidences)
-
-    # 每个chunk的平均值
-    chunk_means = []
-    for start in range(0, n, chunk_size):
-        end = min(start + chunk_size, n)
-        chunk_means.append(confidences[start:end].mean())
-    
-    # 汇总指标
-    results = {
-        "seq_avg_confidence": confidences.mean(),
-        "chunk_avg_confidences": chunk_means,
-        "last_chunk_confidence": chunk_means[-1] if chunk_means else None,
-        "min_chunk_confidence": min(chunk_means) if chunk_means else None,
-    }
-    return results
 
 
-# ======================
-# 数据层
-# ======================
-
-max_token_dataset = {
-    "gsm8k": 1000,
-    "math": 1500,
-    "aime24": 6000,
-    "aime25": 6000,
-    "amc23": 2000,
-    "math500": 1500,
-    "minerva": 2000,
-    "olympiad_bench": 6000,
-    "openrl": 1000,
-    "dapo": 3000,
-}
-max_batch_size ={
-    "gsm8k": 20,
-    "math": 20,
-    "aime24": 5,
-    "aime25": 5,
-    "amc23": 15,
-    "math500": 15,
-    "minerva": 15,
-    "olympiad_bench": 5,
-    "openrl": 20,
-    "dapo": 5,
-}
-
-from transformers import LogitsProcessor
-
-class ForceNextTokenProcessor(LogitsProcessor):
-    def __init__(self, trigger_token_id, forced_token_id):
-        self.trigger_token_id = trigger_token_id
-        self.forced_token_id = forced_token_id
-        self.active = False   # 是否触发
-
-    def __call__(self, input_ids, scores):
-        # input_ids: (batch, seq_len)
-        last_token_id = input_ids[0, -1].item()
-
-        # 如果上一个 token 是 trigger，就激活
-        if last_token_id == self.trigger_token_id:
-            self.active = True
-
-        if self.active:
-            # 把所有概率压到 forced_token_id 上
-            mask = torch.full_like(scores, float("-inf"))
-            mask[..., self.forced_token_id] = 0
-            scores = mask
-            self.active = False  # 只控制一步
-
-        return scores
-
-def load_dataset_by_name(name: str):
-    mapping = {
-        "gsm8k": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/gsm8k/test-new.parquet",
-        "math": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/math-algebra/test-new.parquet",
-        "aime24": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/aime24/raw.parquet",
-        "aime25": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/aime25/default.parquet",
-        "amc23": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/amc23/default.parquet",
-        "math500": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/math500/default-new.parquet",
-        "minerva": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/minerva/default.parquet",
-        "olympiad_bench": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/olympiad_bench/default-new.parquet",
-        "openrl": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/test.parquet",
-        "openrl-train": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/sub-train.parquet",
-        "openrl-raw-test": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/openrl/raw_test.parquet",
-        "dapo": "/home/fit/alex/Kaisen.Yang/CoT Decomposition/dataset/dapo/eval.parquet",
-    }
-    if name.endswith(".parquet"):
-        return Dataset.from_parquet(name), name.split("/")[-1].split(".")[0]
-    return Dataset.from_parquet(mapping[name]), name
 
 
-def merge_model(model_path):
-    if os.path.exists(os.path.join(model_path, 'full.safetensors')):
-        print("Merged model already exists.")
-        return torch.load(os.path.join(model_path, 'full.safetensors'), weights_only=False)
-    
-    ckpts={}
-    world_size = 8
-    shard_files = [os.path.join(model_path,f'model_world_size_8_rank_{i}.pt') for i in range(world_size)]
-        
-    for file_path in shard_files:
-        tensors = torch.load(file_path,weights_only=False)
-        for n,p in tensors.items():
-            if n not in ckpts:
-                p=p.to_local()
-                p = torch.tensor(p)
-                ckpts[n] = p
-            else:
-                p=p.to_local()
-                p = torch.tensor(p)
-                
-                ckpts[n] = torch.cat([ckpts[n],p],dim=0)
-    torch.save(ckpts, os.path.join(model_path, 'full.safetensors'))
-    return ckpts
-
-def check_resume(path, seed, rank):
-    result_file = os.path.join(path, f"result_{seed}_rank{rank}.json")
-    static_file = os.path.join(path, f"static_{seed}_rank{rank}.json")
-    if os.path.exists(result_file) and os.path.exists(static_file):
-        with open(result_file, "r") as f:
-            results = json.load(f)
-        with open(static_file, "r") as f:
-            static = json.load(f)
-        return results, static
-    return [],{}
-
-
-# ======================
-# 熵统计工具类
-# ======================
-class EntropyCalculator:
-    """用于计算特定标记区间的熵统计"""
-    
-    def __init__(self, tokenizer):
-        self.tokenizer = tokenizer
-    
-    def get_token_id(self, token_str):
-        """将标记字符串转换为token id"""
-        if token_str == 'begin':
-            return None  # 表示序列开始
-        elif token_str == 'end':
-            return None  # 表示序列结束
-        else:
-            return self.tokenizer.convert_tokens_to_ids(token_str)
-
-    
-
-    def calculate_entropy_stats(self, sample, start_token, end_token):
-        """
-        计算特定标记区间的熵统计
-        tokens: token id列表
-        entropies: 对应的熵值列表
-        start_token: 开始标记（字符串或'begin'/'end'）
-        end_token: 结束标记（字符串或'begin'/'end'）
-        """
-        tokens, entropies,confidences = sample
-        
-        start_id = self.get_token_id(start_token)
-        # 找到开始位置
-        if start_token == 'begin':
-            start_idx = 0
-            
-        elif start_id in tokens:
-            start_idx = tokens.index(start_id)
-        else:
-            return None  # 开始标记不存在
-        
-        if end_token == 'end':
-            end_id = self.tokenizer.eos_token_id
-        else:
-            end_id = self.get_token_id(end_token)
-            
-        if end_id in tokens:
-            end_idx = tokens.index(end_id)
-        else:
-            return None
-        
-        if self.tokenizer.eos_token_id in tokens:
-            valid_end_pos = tokens.index(self.tokenizer.eos_token_id)
-        else:
-            valid_end_pos = len(tokens) - 1
-        
-        # 确保结束位置在开始位置之后
-        if end_idx <= start_idx:
-            return None
-        
-        # 提取区间内的熵值
-        segment_entropies = entropies[start_idx:end_idx + 1]
-        
-        # 计算统计量
-        length = len(segment_entropies)
-        total_entropy = sum(segment_entropies)
-        avg_entropy = total_entropy / length if length > 0 else 0
-        
-        max_step = get_max_step(self.tokenizer.decode(tokens[start_idx:end_idx + 1]))
-        return {
-            "length": length,
-            "total_entropy": total_entropy,
-            "avg_entropy": avg_entropy,
-            "start_idx": start_idx,
-            "end_idx": end_idx,
-            "max_step": max_step,
-            "confidences": compute_confidence_metrics(confidences[start_idx:end_idx + 1]),
-            "entropies": entropies[0:valid_end_pos + 1],
-            "confidences_all": confidences[0:valid_end_pos + 1],
-        }
-    
-    def calculate_batch_entropy_stats(self, sample,start_token, end_token):
-        """
-        批量计算熵统计
-        all_tokens: 所有样本的token列表
-        all_entropies: 所有样本的熵值列表
-        start_token, end_token: 区间标记
-        """
-        all_tokens, all_entropies, all_confidences = sample
-        
-        stats_list = []
-        
-        for tokens, entropies,confidences in zip(all_tokens, all_entropies,all_confidences):
-            stats = self.calculate_entropy_stats((tokens, entropies,confidences),start_token, end_token)
-            if stats is not None:
-                stats_list.append(stats)
-        
-        if not stats_list:
-            return {
-                "avg_length": 0,
-                "avg_total_entropy": 0,
-                "avg_entropy_per_token": 0,
-                "sample_count": 0
-            }
-        
-        # 计算平均值
-        return {
-            "avg_length": statistics.mean([s["length"] for s in stats_list]),
-            "avg_total_entropy": statistics.mean([s["total_entropy"] for s in stats_list]),
-            "avg_entropy_per_token": statistics.mean([s["avg_entropy"] for s in stats_list]),
-            "sample_count": len(stats_list)
-        }
-
-
-# ======================
-# 推理层
-# ======================
-def load_model(cfg, device="cuda"):
-    model = AutoModelForCausalLM.from_pretrained(cfg.model_path, torch_dtype=torch.bfloat16, device_map=device,
-                attn_implementation="flash_attention_2",
-                                                 )
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model_path)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if cfg.type == "fsdp":
-        checkpoints = merge_model(cfg.checkpoint_path)
-        model.load_state_dict(checkpoints, strict=False)
-    elif cfg.type == "lora":
-        raise NotImplementedError
-    
-    return model, tokenizer
 
 def generate_and_compute_entropy(
     model,
@@ -299,12 +37,10 @@ def generate_and_compute_entropy(
     sample_num=1,
     temperature=1.0,
     top_p=0.7,
-    thinkinig=False,
-    dtype=torch.bfloat16,
+    need_static=True
 ):
     """支持多次采样（高效版，一次前向生成多样本）"""
     # 批处理输入
-    print(input_text[0])
     input_ids = tokenizer(
         input_text,
         return_tensors="pt",
@@ -312,15 +48,10 @@ def generate_and_compute_entropy(
         padding_side="left"
     ).to(device)
     B = len(input_text)  # batch size
-
+    print(B,sample_num)
     model.eval()
     model.to(device)
     logit_processors = []
-    if not thinkinig:
-        logit_processors.append(ForceNextTokenProcessor(
-            trigger_token_id=tokenizer.convert_tokens_to_ids("<think>"),
-            forced_token_id=tokenizer.convert_tokens_to_ids("</think>")
-        ))
 
     with torch.no_grad():
         outputs = model.generate(
@@ -380,9 +111,84 @@ def generate_and_compute_entropy(
                 
 
             all_results.append((tokens, entropies, confidences))
+    if need_static:
+        return all_results
+    else:
+        return [all_results[i][0] for i in range(len(all_results))]
 
-    return all_results
 
+
+def calculate_entropy(token_logprob_dict):
+    entropy = 0.0
+    for id,logprob in token_logprob_dict.items():
+        prob = torch.exp(torch.tensor(logprob.logprob))
+        entropy -= prob * logprob.logprob
+    return entropy.item()
+
+def calculate_confidence(token_logprob_dict,K=5):
+    sorted_logprobs = sorted([logprob.logprob for id, logprob in token_logprob_dict.items()], reverse=True)
+    top_k_logprobs = sorted_logprobs[:K]
+    confidence = -sum(top_k_logprobs)
+    return confidence
+
+def generate_and_compute_entropy_vllm(
+    model: LLM,
+    input_text: List[str],
+    max_new_tokens: int,
+    sample_num: int = 1,
+    temperature: float = 1.0,
+    top_p: float = 0.7,
+    stop_token: str = None
+):
+    """
+    使用 vllm 生成文本并获取每个生成 token 的对数概率。
+
+    Args:
+        model (LLM): vLLM 实例。
+        input_text (List[str]): 输入提示的列表。
+        max_new_tokens (int): 生成的新 token 的最大数量。
+        sample_num (int): 每个提示生成的样本数量。
+        temperature (float): 采样温度。
+        top_p (float): top-p 采样值。
+        stop_token (str): 停止生成的 token。
+
+    Returns:
+        一个元组列表。每个元组包含一个生成的文本列表和每个文本对应的 token 对数概率列表。
+    """
+    
+    # 配置采样参数
+    sampling_params = SamplingParams(
+        n=sample_num,
+        temperature=temperature,
+        top_p=top_p,
+        max_tokens=max_new_tokens,
+        stop_token_ids=[model.get_tokenizer().convert_tokens_to_ids(stop_token)] if stop_token else None,
+        logprobs=1  # 请求每一步生成的 token 的对数概率
+    )
+
+    # 生成文本和对数概率
+    outputs = model.generate(input_text, sampling_params)
+
+    results = []
+    
+    for output in outputs:
+        generated_texts = []
+        token_logprobs = []
+        confidence_list = []
+        # 获取批次内每个样本的结果
+        for sequence in output.outputs:
+            generated_texts.append(sequence.text)
+            
+            # logprobs 对象是字典的列表，每个字典对应一个 token
+            logprob_list = [calculate_entropy(token) for token in sequence.logprobs]
+            
+            confidence_list.append([calculate_confidence(token) for token in sequence.logprobs])
+            
+            token_logprobs.append(logprob_list)
+
+        results.append((generated_texts, token_logprobs, confidence_list))
+
+    return results
 
 
 
@@ -394,15 +200,6 @@ def decode_predictions(tokenizer, tokens, special_tokens, answer_seg):
     return pred_texts, answers
 
 
-# def decode_with_selected_special_tokens(tokenizer, special_tokens, token_ids):
-#     decoded_text = ""
-#     for token_id in token_ids:
-#         token = tokenizer.decode([token_id])
-#         if token in special_tokens:
-#             decoded_text += token
-#         elif token.strip():
-#             decoded_text += token
-#     return decoded_text
 def decode_with_selected_special_tokens(tokenizer, special_tokens, token_ids):
             """
             解码 token 序列，仅保留指定的特殊 token，移除其他特殊 token。
@@ -434,22 +231,20 @@ def decode_with_selected_special_tokens(tokenizer, special_tokens, token_ids):
 # ======================
 def check_format(text, checklist):
     return all(key in text for key in checklist)
-import re
-def get_max_step(text: str) -> int:
-    """
-    提取文本中的序号步骤，返回最大序号（支持任意位数字）
 
-    Args:
-        text (str): 输入文本
-
-    Returns:
-        int: 文本中最大的序号，如果没有找到返回0
-    """
-    # 匹配任意位数字序号，格式如 1. 或 2)
-    matches = re.findall(r'\b(\d+)[\.\)]', text)
-    numbers = [int(num) for num in matches]
-    return max(numbers) if numbers else 0
-
+def multi_choice_evaluate(pred, gt):
+    boxed_answer = pred.split("boxed{")[-1]
+    boxed_answer = boxed_answer[:10]
+    boxed_answer = boxed_answer.split("}")[0]
+    if len(boxed_answer)==1:
+        if boxed_answer==gt['answer_idx']:
+            return True
+    else:
+        if normalize_final_answer(gt['answer']) in normalize_final_answer(pred[:100]):
+            return True
+    return False
+    
+    
 def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
     """
     samples: List[ (tokens, entropies) ]  # 每次采样的结果
@@ -500,18 +295,33 @@ def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
             tokens = samples[s][0][i]
             entropies = samples[s][1][i]
             confidences = samples[s][2][i]
-            
             full_text = all_pred_texts[s][i]
-            succ = (normalize_final_answer(gt_answers[i]) in normalize_final_answer(pred))
+            boxed_count = full_text.count("boxed")
+            
+            if isinstance(gt_answers[i],dict):
+                succ = multi_choice_evaluate(pred, gt_answers[i])
+                pre_answer = pred.split("boxed{")[-1]
+            else:
+                gt,p_float = normalize_final_answer(gt_answers[i])
+                succ = False
+                pre_answer = ""
+                # find every boxed and compare with gt
+                for pre_answer in extract_boxed_content(full_text):
+                    pre_answer, q_float = normalize_final_answer(pre_answer)
+                    if pre_answer == gt or (q_float is not None and q_float == p_float):
+                        succ = True
+                        break
             fmt = check_format(full_text, cfg.eval.checklist)
             per_sample_success.append(succ)
             per_sample_format.append(fmt)
+            
             per_sample_outputs.append({
-                "answer": normalize_final_answer(pred),
+                "answer": pre_answer,
                 "full_text": full_text,
                 "success": succ,
                 "format_success": fmt,
-                "static": entropy_calculator.calculate_entropy_stats((tokens, entropies,confidences),cfg.eval.head[0], cfg.eval.tail[0])
+                "static": entropy_calculator.calculate_entropy_stats((tokens, entropies,confidences),cfg.eval.head[0], cfg.eval.tail[0]) if cfg.eval.need_static else None,
+                "boxed_count": boxed_count
             })
 
         # 平均成功率：样本成功率的均值
@@ -526,7 +336,8 @@ def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
             "samples": per_sample_outputs,
             "avg_success": sum(per_sample_success) / sample_num,
             "best_success": 1 if any(per_sample_success) else 0,
-            
+            "finish_rate": sum([1 for out in per_sample_outputs if out['boxed_count']>0]) / sample_num,
+            "finish_and_correct_rate": sum([1 for out in per_sample_outputs if out['boxed_count']>0 and out['success']]) / sample_num
         })
 
     batch_stats = {
@@ -534,6 +345,7 @@ def evaluate_batch(questions, gt_answers, samples, cfg, tokenizer):
         "best_success": success_best / K,
         "format_avg": format_avg / K,
         "all_number": K,
+        
         "entropy_stats": entropy_stats  # 添加熵统计
     }
     
@@ -592,7 +404,8 @@ def merge_results_from_all_ranks(save_path, seed, world_size,save_head=False):
     all_results = []
     all_static = {"avg_success": 0, "best_success": 0, "format_avg": 0, "all_number": 0, "entropy_stats": {}}
     total_samples = 0
-    
+    finish_count = 0
+    finish_and_correct_count = 0
     for rank in range(world_size):
         result_file = os.path.join(save_path, f"result_{seed}_rank{rank}.json")
         static_file = os.path.join(save_path, f"static_{seed}_rank{rank}.json")
@@ -633,6 +446,10 @@ def merge_results_from_all_ranks(save_path, seed, world_size,save_head=False):
         avg_success = result.get("avg_success", 0)
         success_entropy = -avg_success*torch.log(torch.tensor(avg_success) + 1e-8) - (1 - avg_success)*torch.log(torch.tensor(1 - avg_success) + 1e-8)
         entropies.append(success_entropy.item())
+        finish_count += sum([1 for out in result['samples'] if out['boxed_count']>0])
+        finish_and_correct_count += sum([1 for out in result['samples'] if out['boxed_count']>0 and out['success']])
+    all_static['finish_rate'] = finish_count/ (len(all_results)*len(all_results[0]['samples'])) if total_samples>0 else 0
+    all_static['finish_and_correct_rate'] = finish_and_correct_count/ finish_count if finish_count>0 else 0
     all_static['success_entropy'] = sum(entropies)/len(entropies) if len(entropies) > 0 else 0
     
     if save_head:
@@ -655,35 +472,37 @@ def merge_results_from_all_ranks(save_path, seed, world_size,save_head=False):
         print(f"📊 最终统计: 平均成功率={all_static['avg_success']:.2%}, "
               f"最好成功率={all_static['best_success']:.2%}, "
               f"格式率={all_static['format_avg']:.2%}")
+    
+    
+    
+    plot_by_task_samples(all_results, save_path,10)
 
 
 # ======================
 # 主控
 # ======================
-
 @hydra.main(version_base=None, config_path="config", config_name="eval")
 def eval_main(cfg):
-    # 初始化分布式
     ddp_setup()
     rank = torch.distributed.get_rank()
     world_size = torch.distributed.get_world_size()
     device = f"cuda:{rank}"
     torch.manual_seed(cfg.eval.seed + rank)  # 不同rank使用不同的随机种子
-
     model, tokenizer = load_model(cfg.model, device)
-    
-    # 使用DDP包装模型
+        
+        # 使用DDP包装模型
     model = DDP(model, device_ids=[rank])
     
     overall_stats = {}
     
     if 'all' in cfg.eval.dataset:
         cfg.eval.dataset = ["gsm8k", "math", "aime24", "aime25", "amc23", "math500", "minerva", "olympiad_bench"]
-    
+    if 'med' in cfg.eval.dataset:
+        cfg.eval.dataset = ["medqa","medmcqa","pubmedqa","clinical_knowledge","college_biology","college_medicine","medical_genetics","professional_medicine","anatomy"]
     for dataset_name in cfg.eval.dataset:
         dataset, dataset_name = load_dataset_by_name(dataset_name)
         if cfg.eval.batch_size == -1:
-            batch_size = max_batch_size.get(dataset_name, 10)
+            batch_size = max_batch_size.get(dataset_name, 10) // cfg.eval.sample_num  # 每个rank的batch size
         else:
             batch_size = cfg.eval.batch_size // cfg.eval.sample_num  # 每个rank的batch size
         if cfg.eval.max_new_tokens == -1:
@@ -691,43 +510,68 @@ def eval_main(cfg):
         else:
             max_tokens = cfg.eval.max_new_tokens    
         
-        
-        
         save_path = os.path.join(cfg.eval.save_path, dataset_name)
         os.makedirs(save_path, exist_ok=True)
         if cfg.eval.get('resume', False):
             results, static = check_resume(save_path, cfg.eval.seed, rank)
+            print(f"[Rank {rank}] Resuming evaluation for dataset {dataset_name} from {len(results)} existing results.")
         else:
             results, static = [], {}
-
-        # 获取当前rank的数据子集
-        subset, subset_size = get_distributed_dataloader(dataset, batch_size, rank, world_size)
         
+        subset, subset_size = get_distributed_dataloader(dataset, batch_size, rank, world_size)
+        # 初始化 tqdm（只在 rank0）
         if rank == 0:
-            bar = tqdm.tqdm(total=len(dataset), desc=f"Processing {dataset_name}")
+            bar = tqdm.tqdm(total=len(dataset), desc=f"Processing {dataset_name}", position=0, leave=True)
         else:
             bar = None
-        if len(results) > 0 and bar is not None: 
-            bar.update(len(results))  # 更新已处理的数量
-        # 初始化熵统计累计
-        cumulative_entropy_stats = {}
-        
-        for i in range(len(results), subset_size, batch_size):
+
+        # --- 本地累计量（用于 all_reduce 同步全局累计） ---
+        # local_cum_processed: 本 rank 累计已处理样本数（resume 时从 static 读）
+        if static and "all_number" in static and static["all_number"] > 0:
+            local_cum_processed = int(static["all_number"])
+            # 为了能正确合并 avg_success/best_success/format，我们用 sum 而不是平均值
+            local_avg_succ_sum = float(static.get("avg_success", 0.0)) * local_cum_processed
+            local_best_succ_sum = float(static.get("best_success", 0.0)) * local_cum_processed
+            local_fmt_sum = float(static.get("format_avg", 0.0)) * local_cum_processed
+            # results 已包含本 rank 的历史结果（由 check_resume 提供）
+        else:
+            local_cum_processed = 0
+            local_avg_succ_sum = 0.0
+            local_best_succ_sum = 0.0
+            local_fmt_sum = 0.0
+
+        # 如果有已处理的本地结果，需要把全局初始进度同步到 rank0（避免直接用 bar.update(len(results))）
+        init_buf = torch.tensor(
+            [local_cum_processed, local_avg_succ_sum, local_best_succ_sum, local_fmt_sum],
+            device=device, dtype=torch.float64
+        )
+        if cfg.eval.backend=='hf':
+            torch.distributed.all_reduce(init_buf, op=torch.distributed.ReduceOp.SUM)
+        if rank == 0:
+            global_processed_init = int(init_buf[0].item())
+            if global_processed_init > 0:
+                # 设置 bar 的初始位置（绝对设定，避免 update 导致负数）
+                bar.n = global_processed_init
+                bar.refresh()
+                # 打印初始全局统计（可选）
+                avg_success_init = init_buf[1].item() / global_processed_init
+                best_success_init = init_buf[2].item() / global_processed_init
+                fmt_init = init_buf[3].item() / global_processed_init
+                print(f"[Init Global] processed={global_processed_init} | "
+                      f"avg_success={avg_success_init:.2%} | best_success={best_success_init:.2%} | format={fmt_init:.2%}")
+        # 如果已经有 results（本 rank resume），跳过已处理的索引
+        start_idx = len(results)
+        # 如果 bar 需要反映已经写入文件的本地结果数量，也由上面同步确保一致
+        for i in range(start_idx, subset_size, batch_size):
             batch_data = subset[i:i + batch_size]
-            # guidelines = [d.get('correct_explorations', []) for d in batch_data]
             guidelines = [d.get('exploration', '') for d in batch_data]
-            
-            
-            # 随机选择一条
-            # import random
-            # guidelines = [random.choice(g) if len(g) > 0 else "" for g in guidelines]
-            
+
             questions = [
                 tokenizer.apply_chat_template(
-                    [{"role": "user", "content": q["question"] + cfg.eval.question_suffix.replace("<guideline>", g)}],
+                    [{"role": "user", "content": cfg.eval.get('question_prefix','')+q["question"] + cfg.eval.get('question_suffix','').replace("<guideline>", g)}],
                     tokenize=False,
                     add_generation_prompt=True,
-                    enable_thinking=cfg.eval.get("enable_thinking", False)
+                    enable_thinking=cfg.eval.get("enable_thinking", True)
                 ) + cfg.eval.get("solution_prefix", "").replace("<guideline>", g)
                 for q, g in zip(batch_data, guidelines)
             ]
@@ -736,8 +580,6 @@ def eval_main(cfg):
                 with open(cfg.eval.head_path, "r") as f:
                     head_dict = json.load(f)
                 questions = [q+head_dict.get(q, questions[idx]) for idx, q in enumerate(questions)]
-            
-            # print(questions[0])
             gt_answers = [d["answer"] for d in batch_data]
 
             # === 多次采样 ===
@@ -754,11 +596,11 @@ def eval_main(cfg):
             batch_results, batch_stats = evaluate_batch(questions, gt_answers, samples, cfg, tokenizer)
             results.extend(batch_results)
 
-            # 更新统计
+            # 更新本地 static（保持原逻辑）
             if not static:
                 static = {"avg_success": 0, "best_success": 0, "format_avg": 0, "all_number": 0, "entropy_stats": {}}
             
-            # 更新准确率统计
+            # 更新准确率统计（按你原来加权平均逻辑）
             static["avg_success"] = (static["avg_success"] * static["all_number"] + batch_stats["avg_success"] * batch_stats["all_number"]) / (static["all_number"] + batch_stats["all_number"])
             static["best_success"] = (static["best_success"] * static["all_number"] + batch_stats["best_success"] * batch_stats["all_number"]) / (static["all_number"] + batch_stats["all_number"])
             static["format_avg"] = (static["format_avg"] * static["all_number"] + batch_stats["format_avg"] * batch_stats["all_number"]) / (static["all_number"] + batch_stats["all_number"])
@@ -786,15 +628,45 @@ def eval_main(cfg):
             with open(os.path.join(save_path, f"static_{cfg.eval.seed}_rank{rank}.json"), "w") as f:
                 json.dump(static, f, ensure_ascii=False, indent=4)
 
-            log_batch_stats(i // cfg.eval.batch_size, batch_stats, rank)
+            # ========== 全局同步（累计量） ==========
+            # 把本 rank 的累计值累加（注意 static["all_number"] 是本 rank 到目前为止的累计）
+            local_cum_processed = int(static["all_number"])
+            # local 的累计和（用于算总体平均）
+            local_avg_succ_sum += batch_stats["avg_success"] * batch_stats["all_number"]
+            local_best_succ_sum += batch_stats["best_success"] * batch_stats["all_number"]
+            local_fmt_sum += batch_stats["format_avg"] * batch_stats["all_number"]
+
+            buf = torch.tensor(
+                [local_cum_processed, local_avg_succ_sum, local_best_succ_sum, local_fmt_sum],
+                device=device, dtype=torch.float64
+            )
+            torch.distributed.all_reduce(buf, op=torch.distributed.ReduceOp.SUM)
+
+            if rank == 0:
+                global_processed = int(buf[0].item())
+                if global_processed > 0:
+                    avg_success = buf[1].item() / global_processed
+                    best_success = buf[2].item() / global_processed
+                    format_rate = buf[3].item() / global_processed
+
+                    # 直接把 bar 设为绝对值并刷新（避免负数）
+                    if bar is not None:
+                        bar.n = global_processed
+                        bar.refresh()
+
+                    # 打印全局实时统计
+                    print(f"[Global] ✅ processed={global_processed} | "
+                          f"avg_success={avg_success:.2%} | best_success={best_success:.2%} | "
+                          f"format={format_rate:.2%}")
+
+            # 本地日志（按你原来逻辑）
+            log_batch_stats(i // batch_size, batch_stats, rank)
             if rank == 0:
                 print("累计统计:")
-                log_batch_stats(i // cfg.eval.batch_size, static, rank)
-                bar.update(cfg.eval.batch_size * world_size)
+                log_batch_stats(i // batch_size, static, rank)
 
         overall_stats[dataset_name] = static
         
-        # 等待所有rank完成当前数据集
         torch.distributed.barrier()
         
         # 合并所有rank的结果
@@ -810,12 +682,14 @@ def eval_main(cfg):
 
     # 清理分布式环境
     destroy_process_group()
+
 if __name__ == "__main__":
     eval_main()
     
-#  torchrun --nproc_per_node=8 --nnodes=1 --node_rank=0 eval.py --config-path config --config-name eval-rl
 
 """
 usage:
 torchrun --nproc_per_node=8 --nnodes=1 --node_rank=0
+torchrun --nproc_per_node=8 --master-port 20000 eval.py --config-path config --config-name test
+
 """
